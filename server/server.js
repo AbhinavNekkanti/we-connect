@@ -1,3 +1,4 @@
+
 import express from "express";
 import http from "http";
 import cors from "cors";
@@ -5,6 +6,7 @@ import { Server } from "socket.io";
 import { randomUUID } from "crypto";
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
@@ -37,6 +39,7 @@ io.on("connection", (socket) => {
 
     if (oldUsername) {
       socket.leave(oldUsername);
+
       onlineCounts.set(
         oldUsername,
         Math.max(0, (onlineCounts.get(oldUsername) || 1) - 1)
@@ -52,12 +55,16 @@ io.on("connection", (socket) => {
     );
 
     sendOnlineUsers();
+
     console.log(`${username} joined`);
   });
 
   socket.on("private_message", (data) => {
     const sender = socketUsers.get(socket.id);
-    if (!sender || !data.receiver || !data.message?.trim()) return;
+
+    if (!sender || !data.receiver || !data.message?.trim()) {
+      return;
+    }
 
     const message = {
       id: randomUUID(),
@@ -74,38 +81,67 @@ io.on("connection", (socket) => {
 
     messages.push(message);
 
-    io.to(message.receiver).emit("receive_private_message", message);
-    socket.emit("receive_private_message", message);
+    io.to(message.receiver).emit(
+      "receive_private_message",
+      message
+    );
+
+    socket.emit(
+      "receive_private_message",
+      message
+    );
   });
 
   socket.on("get_conversation", ({ withUser }) => {
     const username = socketUsers.get(socket.id);
-    if (!username || !withUser) return;
+
+    if (!username || !withUser) {
+      return;
+    }
 
     const history = messages.filter(
       (message) =>
-        (message.sender === username && message.receiver === withUser) ||
-        (message.sender === withUser && message.receiver === username)
+        (message.sender === username &&
+          message.receiver === withUser) ||
+        (message.sender === withUser &&
+          message.receiver === username)
     );
 
     socket.emit("conversation_history", history);
   });
 
   socket.on("like_message", ({ messageId }) => {
-    const message = messages.find((item) => item.id === messageId);
-    if (!message) return;
+    const message = messages.find(
+      (item) => item.id === messageId
+    );
+
+    if (!message) {
+      return;
+    }
 
     message.likes += 1;
 
-    io.to(message.sender).emit("message_liked", message);
-    io.to(message.receiver).emit("message_liked", message);
+    io.to(message.sender).emit(
+      "message_liked",
+      message
+    );
+
+    io.to(message.receiver).emit(
+      "message_liked",
+      message
+    );
   });
 
   socket.on("typing", ({ receiver }) => {
     const sender = socketUsers.get(socket.id);
-    if (!sender || !receiver) return;
 
-    io.to(receiver).emit("typing", { from: sender });
+    if (!sender || !receiver) {
+      return;
+    }
+
+    io.to(receiver).emit("typing", {
+      from: sender,
+    });
   });
 
   socket.on("disconnect", () => {
@@ -114,10 +150,14 @@ io.on("connection", (socket) => {
     if (username) {
       onlineCounts.set(
         username,
-        Math.max(0, (onlineCounts.get(username) || 1) - 1)
+        Math.max(
+          0,
+          (onlineCounts.get(username) || 1) - 1
+        )
       );
 
       socketUsers.delete(socket.id);
+
       sendOnlineUsers();
 
       console.log(`${username} disconnected`);
@@ -129,10 +169,13 @@ app.get("/", (req, res) => {
   res.send("We-Connect server is running");
 });
 
-server.listen(4000, () => {
+const PORT = process.env.PORT || 4000;
+
+server.listen(PORT, () => {
   console.log("================================");
   console.log("       WE-CONNECT SERVER");
   console.log("================================");
-  console.log("Server: http://localhost:4000");
+  console.log(`Server running on port ${PORT}`);
   console.log("================================");
 });
+
